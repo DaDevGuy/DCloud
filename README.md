@@ -1,4 +1,4 @@
-# Discord Cloud Storage System
+# DCloud
 
 This is a Discord-based cloud storage system designed for educational purposes, implemented in Node.js. It allows users to upload files, which are then broken into 8MB chunks and encrypted before being uploaded to a Discord server. Upon download, the files are decrypted and reassembled.
 
