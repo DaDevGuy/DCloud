@@ -4,7 +4,6 @@ const progressBarContainer = document.getElementById('progressBarContainer');
 const progressBar = document.getElementById('progressBar');
 const totalSizeContainer = document.getElementById('totalSize');
 
-// Function to handle file upload
 uploadForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     
@@ -12,18 +11,17 @@ uploadForm.addEventListener('submit', async (event) => {
     const response = await fetch('/upload', {
         method: 'POST',
         body: formData,
-        // Add option to track upload progress
         onUploadProgress: (progressEvent) => {
             const progress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
             progressBar.style.width = `${progress}%`;
-            progressBar.textContent = `${progress}%`; // Display progress text
+            progressBar.textContent = `${progress}%`; 
         }
     });
 
     if (response.ok) {
         alert('File uploaded successfully');
-        progressBar.style.width = '0%'; // Reset progress bar after upload
-        progressBar.textContent = ''; // Clear progress text
+        progressBar.style.width = '0%'; 
+        progressBar.textContent = ''; 
         refreshFileList();
     } else {
         alert('Error uploading file');
@@ -31,11 +29,6 @@ uploadForm.addEventListener('submit', async (event) => {
 });
 
 
-// Function to fetch and display uploaded files
-// (Remaining code remains the same)
-
-
-// Function to fetch and display uploaded files
 async function refreshFileList() {
     const response = await fetch('/files');
     const files = await response.json();
@@ -79,7 +72,6 @@ async function refreshFileList() {
     });
 }
 
-// Function to delete file
 async function deleteFile(fileId) {
     const response = await fetch(`/delete/${fileId}`, {
         method: 'DELETE'
