@@ -1,24 +1,26 @@
 {
-  "name": "cloud",
-  "version": "1.0.0",
-  "description": "Simple Discord Cloud Storage Model.",
+  "name": "dcloud",
+  "version": "2.0.0",
+  "description": "Discord-based encrypted cloud storage",
   "main": "index.js",
-  "scripts": {
-    "start": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
   "author": "DaDevGuy",
-  "license": "ISC",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "docker:build": "docker build -t dcloud .",
+    "docker:run": "docker run -d -p 3000:3000 --env-file .env -v $(pwd)/files.db:/app/files.db -v $(pwd)/uploads:/app/uploads --name dcloud dcloud",
+    "docker:compose": "docker-compose up -d",
+    "docker:compose:logs": "docker-compose logs -f"
+  },
+  
   "dependencies": {
-    "crypto": "^1.0.1",
-    "discord.js": "^13.17.1",
-    "dotenv": "^16.4.5",
-    "express": "^4.18.2",
-    "fs": "^0.0.1-security",
-    "multer": "^1.4.5-lts.1",
-    "nodemon": "^3.0.3",
-    "sqlite3": "^5.1.7",
-    "stream": "^0.0.2"
+    "discord.js": "^14.0.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.3",
+    "multer": "^1.4.4",
+    "sqlite3": "^5.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
   }
 }

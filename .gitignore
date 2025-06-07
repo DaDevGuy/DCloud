@@ -1,3 +1,4 @@
 node_modules
 .env
 files.db
+/data/files.db
