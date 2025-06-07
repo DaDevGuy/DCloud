@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCloud Setup</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="setup.css">
+    <link rel="icon" type="image/x-icon" href="favicon.png">
+    <!-- Inline critical CSS as fallback -->
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
+        .setup-container { max-width: 700px; margin: 40px auto; }
+        .setup-card { background-color: white; border-radius: 8px; padding: 30px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .hidden { display: none; }
+        .btn { padding: 10px 20px; background-color: #4a6bff; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="logo-container">
+                <i class="fa-solid fa-cloud logo-icon"></i>
+                <h1>DCloud Setup Wizard</h1>
+            </div>
+        </div>
+        
+        <div class="setup-card" id="step1">
+            <h2><i class="fa-solid fa-rectangle-list"></i> Welcome to DCloud Setup</h2>
+            <p>This wizard will help you set up DCloud for the first time. You'll need:</p>
+            <ul>
+                <li>A Discord Bot Token</li>
+                <li>A Discord Channel ID for file storage</li>
+            </ul>
+            <p>We'll automatically generate secure encryption keys for you.</p>
+            <div class="button-container">
+                <button class="btn" onclick="nextStep(1, 2)">Get Started</button>
+            </div>
+        </div>
+        
+        <div class="setup-card hidden" id="step2">
+            <h2><i class="fa-brands fa-discord"></i> Discord Configuration</h2>
+            <div class="setup-form">
+                <div class="form-group">
+                    <label for="botToken">Discord Bot Token</label>
+                    <div class="input-with-icon">
+                        <i class="fa-solid fa-key"></i>
+                        <input type="password" id="botToken" placeholder="Enter your Discord Bot Token">
+                        <button type="button" class="toggle-password" onclick="togglePassword('botToken')">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                    <small>Don't have a bot? <a href="https://discord.com/developers/applications" target="_blank">Create one here</a></small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="channelId">Storage Channel ID</label>
+                    <div class="input-with-icon">
+                        <i class="fa-solid fa-hashtag"></i>
+                        <input type="text" id="channelId" placeholder="Enter channel ID (e.g., 1234567890123456789)">
+                    </div>
+                    <small>To get a channel ID, enable Developer Mode in Discord settings, then right-click on a channel and select "Copy ID"</small>
+                </div>
+                
+                <div id="configError" class="error-message hidden"></div>
+            </div>
+            <div class="button-container">
+                <button class="btn btn-back" onclick="prevStep(2, 1)">Back</button>
+                <button class="btn" id="saveConfigBtn" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+        
+        <div class="setup-card hidden" id="step3">
+            <h2><i class="fa-solid fa-check-circle"></i> Setup Complete!</h2>
+            <div class="success-container">
+                <i class="fa-solid fa-circle-check success-icon"></i>
+                <p>DCloud has been successfully configured!</p>
+                <div class="config-info">
+                    <p><strong>Channel ID:</strong> <span id="configuredChannel">-</span></p>
+                    <p><strong>Security:</strong> Encryption keys have been generated automatically</p>
+                </div>
+                <p>DCloud is now restarting to apply your configuration. You'll be redirected automatically.</p>
+                <div class="progress-container">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading-overlay hidden" id="loadingOverlay">
+            <div class="spinner">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+            </div>
+            <p id="loadingMessage">Processing...</p>
+        </div>
+    </div>
+    
+    <footer>
+        <p>DCloud - Secure Discord-Based Cloud Storage</p>
+    </footer>
+    
+    <script src="setup.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  dcloud:
+    build: .
+    container_name: dcloud-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - dcloud_config:/app/config
+    environment:
+      - NODE_ENV=production
+    networks:
+      - dcloud-network
+
+volumes:
+  dcloud_data:
+    driver: local
+  dcloud_config:
+    driver: local
+
+networks:
+  dcloud-network:
+    driver: bridge

@@ -3,34 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Storage Cloud</title>
+    <title>DCloud Storage</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="favicon.png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
 </head>
 <body>
-    <div id="progressBar"></div>
-    <h1>Storage Cloud</h1>
-    
-    <h2>Upload File</h2>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <button type="submit">Upload</button>
-    </form>
+    <div id="toast-container"></div>
 
-    <h2>Uploaded Files</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>File Name</th>
-                <th>File Size</th>
-                <th>Delete</th>
-                <th>Download</th>
-            </tr>
-        </thead>
-        <tbody id="fileList"></tbody>
-        <p id="totalSize">Total File Size: Calculating...</p>
-    </table>
+    <header>
+        <div class="logo-container">
+            <i class="fa-solid fa-cloud logo-icon"></i>
+            <h1>DCloud Storage</h1>
+        </div>
+        <button id="darkModeToggle" class="dark-mode-toggle" aria-label="Toggle dark mode">
+            <i class="fa-solid fa-moon"></i>
+        </button>
+    </header>
+
+    <div class="card">
+        <h2><i class="fa-solid fa-upload"></i> Upload File</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="file-input-container">
+                <label for="fileInput" class="file-input-label">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                    <span id="fileLabel">Choose a file or drag & drop</span>
+                </label>
+                <input type="file" name="file" id="fileInput" required>
+            </div>
+            <button type="submit" class="btn">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+            </button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2><i class="fa-solid fa-file-lines"></i> Uploaded Files</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="fileList"></tbody>
+            </table>
+        </div>
+        <div id="totalSize">Total File Size: Calculating...</div>
+    </div>
 
     <script src="script.js"></script>
 </body>
