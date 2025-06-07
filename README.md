@@ -116,9 +116,3 @@ Once running, access the application at:
 ```
 http://localhost:3000
 ```
-
-## Security Considerations
-
-- Keep your `.env` file secure and never commit it to version control
-- The encryption key and initialization vector are crucial for data security
-- Only share access with trusted users
