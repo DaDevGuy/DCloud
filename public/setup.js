@@ -2,6 +2,53 @@
 let currentToken = '';
 let selectedChannel = '';
 
+const THEME_STORAGE_KEY = 'dcloud-theme';
+
+function applyTheme(theme) {
+    const normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, normalized);
+    } catch {
+        // ignore storage failures
+    }
+    updateThemeToggleUI(normalized);
+}
+
+function getInitialTheme() {
+    try {
+        const saved = localStorage.getItem(THEME_STORAGE_KEY);
+        if (saved === 'dark' || saved === 'light') return saved;
+    } catch {
+        // ignore
+    }
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function updateThemeToggleUI(theme) {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const label = btn.querySelector('.icon-btn-label');
+    const isDark = theme === 'dark';
+    if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    if (label) label.textContent = isDark ? 'Light' : 'Dark';
+    btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+function initTheme() {
+    applyTheme(getInitialTheme());
+    const btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.addEventListener('click', toggleTheme);
+    }
+}
+
 // Helper function to log to console
 function logDebug(message, data) {
     console.log(`[Setup Debug] ${message}`, data || '');
@@ -46,6 +93,33 @@ function hideLoading() {
     logDebug('Loading hidden');
 }
 
+function setFieldState(inputEl, state) {
+    if (!inputEl) return;
+    const group = inputEl.closest('.form-group');
+    if (!group) return;
+    group.classList.remove('is-invalid', 'is-valid');
+    if (state === 'invalid') group.classList.add('is-invalid');
+    if (state === 'valid') group.classList.add('is-valid');
+}
+
+function clearValidation(tokenInput, channelInput) {
+    setFieldState(tokenInput, null);
+    setFieldState(channelInput, null);
+    const configError = document.getElementById('configError');
+    if (configError) {
+        configError.textContent = '';
+        configError.classList.add('hidden');
+    }
+}
+
+function setSavingState(isSaving) {
+    const btn = document.getElementById('saveConfigBtn');
+    if (!btn) return;
+    btn.disabled = isSaving;
+    btn.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+    btn.textContent = isSaving ? 'Saving…' : 'Save Configuration';
+}
+
 // Save configuration
 function saveConfig() {
     const tokenInput = document.getElementById('botToken');
@@ -54,17 +128,21 @@ function saveConfig() {
     
     const token = tokenInput.value.trim();
     const channelId = channelInput.value.trim();
+
+    clearValidation(tokenInput, channelInput);
     
     // Basic validation
     if (!token) {
         configError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Please enter a Discord bot token';
         configError.classList.remove('hidden');
+        setFieldState(tokenInput, 'invalid');
         return;
     }
     
     if (!channelId) {
         configError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Please enter a channel ID';
         configError.classList.remove('hidden');
+        setFieldState(channelInput, 'invalid');
         return;
     }
     
@@ -72,9 +150,14 @@ function saveConfig() {
     if (!/^\d{17,19}$/.test(channelId)) {
         configError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Channel ID should be a number with 17-19 digits';
         configError.classList.remove('hidden');
+        setFieldState(channelInput, 'invalid');
         return;
     }
+
+    setFieldState(tokenInput, 'valid');
+    setFieldState(channelInput, 'valid');
     
+    setSavingState(true);
     showLoading('Saving configuration...');
     
     try {
@@ -95,6 +178,8 @@ function saveConfig() {
             logDebug('Save config response:', data);
             
             if (data.success) {
+                hideLoading();
+                setSavingState(false);
                 // Update completion screen
                 document.getElementById('configuredChannel').textContent = channelId;
                 
@@ -104,16 +189,14 @@ function saveConfig() {
                 // Redirect after delay if appropriate
                 if (data.restartRequired) {
                     setTimeout(() => {
-                        showLoading('Restarting DCloud...');
-                        setTimeout(() => {
-                            window.location.href = '/';
-                        }, 5000); // Wait 5 seconds before redirecting
-                    }, 2000);
+                        window.location.href = '/';
+                    }, 2500);
                 }
             } else {
                 configError.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${data.message}`;
                 configError.classList.remove('hidden');
                 hideLoading();
+                setSavingState(false);
             }
         })
         .catch(error => {
@@ -121,12 +204,14 @@ function saveConfig() {
             configError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> An error occurred while saving the configuration';
             configError.classList.remove('hidden');
             hideLoading();
+            setSavingState(false);
         });
     } catch (error) {
         hideLoading();
         configError.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> An error occurred while saving the configuration';
         configError.classList.remove('hidden');
         logDebug('Save config error:', error);
+        setSavingState(false);
     }
 }
 
@@ -141,13 +226,12 @@ function finishSetup() {
 
 // Check if the service is restarting
 window.addEventListener('load', function() {
+    initTheme();
     // Fetch system status to confirm page is serving from the right mode
     fetch('/api/system-status')
         .then(response => response.json())
         .then(data => {
             console.log('System status:', data);
-            // If we're in setup mode viewing setup page, we're good
-            // If we shouldn't be in setup mode but are, refresh to get app
             if (!data.setupMode) {
                 window.location.href = '/';
             }

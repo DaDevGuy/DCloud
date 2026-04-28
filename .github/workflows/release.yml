@@ -1,4 +1,4 @@
-name: Publish
+name: Release
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3

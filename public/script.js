@@ -5,23 +5,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileList = document.getElementById('fileList');
     const totalSizeElement = document.getElementById('totalSize');
     const darkModeToggle = document.getElementById('darkModeToggle');
-    
-    if (localStorage.getItem('darkMode') === 'true' || 
-        (window.matchMedia('(prefers-color-scheme: dark)').matches && 
-         localStorage.getItem('darkMode') === null)) {
-        document.body.classList.add('dark-mode');
-        darkModeToggle.innerHTML = '<i class="fa-solid fa-sun"></i>';
+
+    const THEME_STORAGE_KEY = 'dcloud-theme';
+
+    function applyTheme(theme) {
+        const normalized = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', normalized);
+        try {
+            localStorage.setItem(THEME_STORAGE_KEY, normalized);
+        } catch {
+            // ignore storage failures
+        }
+        if (darkModeToggle) {
+            darkModeToggle.innerHTML = normalized === 'dark'
+                ? '<i class="fa-solid fa-sun"></i>'
+                : '<i class="fa-solid fa-moon"></i>';
+            darkModeToggle.setAttribute('aria-label', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        }
     }
+
+    function getInitialTheme() {
+        // Migration: old key was boolean-ish `darkMode`
+        try {
+            const legacy = localStorage.getItem('darkMode');
+            if (legacy === 'true') return 'dark';
+            if (legacy === 'false') return 'light';
+        } catch {
+            // ignore
+        }
+
+        try {
+            const saved = localStorage.getItem(THEME_STORAGE_KEY);
+            if (saved === 'dark' || saved === 'light') return saved;
+        } catch {
+            // ignore
+        }
+
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    applyTheme(getInitialTheme());
     
     // Toggle dark mode
-    darkModeToggle.addEventListener('click', function() {
-        document.body.classList.toggle('dark-mode');
-        const isDarkMode = document.body.classList.contains('dark-mode');
-        localStorage.setItem('darkMode', isDarkMode);
-        darkModeToggle.innerHTML = isDarkMode ? 
-            '<i class="fa-solid fa-sun"></i>' : 
-            '<i class="fa-solid fa-moon"></i>';
-    });
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('click', toggleTheme);
+    }
     
     // Show toast message
     function showToast(message, type = 'success') {
@@ -77,11 +110,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function highlight() {
         fileInputLabel.style.borderColor = 'var(--primary-color)';
-        if (document.body.classList.contains('dark-mode')) {
-            fileInputLabel.style.backgroundColor = '#2c3555'; // Darker highlight for dark mode
-        } else {
-            fileInputLabel.style.backgroundColor = '#edf0ff'; // Original highlight for light mode
-        }
+        // Use the same highlight in both themes (it resolves via CSS vars)
+        fileInputLabel.style.backgroundColor = 'rgba(74, 107, 255, 0.08)';
     }
     
     function unhighlight() {

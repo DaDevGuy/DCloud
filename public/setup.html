@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
     <title>DCloud Setup</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="setup.css">
     <link rel="icon" type="image/x-icon" href="favicon.png">
-    <!-- Inline critical CSS as fallback -->
+    <!-- Inline critical CSS as fallback (loaded before setup.css so it can be overridden) -->
     <style>
         body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
         .setup-container { max-width: 700px; margin: 40px auto; }
@@ -15,13 +15,20 @@
         .hidden { display: none; }
         .btn { padding: 10px 20px; background-color: #4a6bff; color: white; border: none; border-radius: 8px; cursor: pointer; }
     </style>
+    <link rel="stylesheet" href="setup.css">
 </head>
 <body>
     <div class="setup-container">
         <div class="setup-header">
             <div class="logo-container">
-                <i class="fa-solid fa-cloud logo-icon"></i>
+                <img src="favicon.png" class="logo-image" alt="DCloud">
                 <h1>DCloud Setup Wizard</h1>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">
+                    <i class="fa-solid fa-moon" aria-hidden="true"></i>
+                    <span class="icon-btn-label">Dark</span>
+                </button>
             </div>
         </div>
         
@@ -93,11 +100,7 @@
             <p id="loadingMessage">Processing...</p>
         </div>
     </div>
-    
-    <footer>
-        <p>DCloud - Secure Discord-Based Cloud Storage</p>
-    </footer>
-    
+
     <script src="setup.js"></script>
 </body>
 </html>
