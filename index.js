@@ -7,7 +7,8 @@ const { GatewayIntentBits, MessageAttachment } = Discord;
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const dotenv = require('dotenv');
-const { exec } = require('child_process');
+
+dotenv.config();
 
 ['uploads', 'data', 'config'].forEach(dir => {
   if (!fs.existsSync(dir)) {
@@ -18,6 +19,18 @@ const { exec } = require('child_process');
 const configDir = path.resolve(__dirname, 'config');
 const configPath = path.resolve(configDir, 'config.json');
 let isConfigValid = false;
+
+let fetchFnPromise;
+function getFetchFn() {
+  if (!fetchFnPromise) {
+    fetchFnPromise = (async () => {
+      if (typeof fetch === 'function') return fetch;
+      const mod = await import('node-fetch');
+      return mod.default || mod;
+    })();
+  }
+  return fetchFnPromise;
+}
 
 function validateConfig() {
   try {
@@ -61,131 +74,155 @@ function validateConfig() {
   }
 }
 
-const app = express();
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-const upload = multer({ dest: 'uploads/' });
-
-app.use(express.static(path.join(__dirname, 'public'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.css') || path.endsWith('.js')) {
-      res.setHeader('Cache-Control', 'no-cache');
-    }
-  }
-}));
-
-app.get('/api/system-status', (req, res) => {
-  res.json({
-    configExists: fs.existsSync(configPath),
-    configValid: validateConfig(),
-    setupMode: !isConfigValid
-  });
-});
-
-function restartApp() {
-  console.log('Restarting application to apply new configuration...');
-  
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(0);
-  } else {
-    exec('node index.js', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error restarting: ${error}`);
-        return;
+function attachCommonMiddleware(app) {
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
+        res.setHeader('Cache-Control', 'no-cache');
       }
-      process.exit(0);
-    });
-  }
+    }
+  }));
 }
 
-isConfigValid = validateConfig();
-console.log(`Configuration valid: ${isConfigValid}`);
+function attachSystemStatusRoute(app) {
+  app.get('/api/system-status', (req, res) => {
+    res.json({
+      configExists: fs.existsSync(configPath),
+      configValid: validateConfig(),
+      setupMode: !isConfigValid
+    });
+  });
+}
 
-if (!isConfigValid) {
+function attachListenErrorHandlers(server, port) {
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`Failed to start server. Is port ${port} in use?`);
+      process.exit(1);
+    }
+    console.error('Server error:', err);
+    process.exit(1);
+  });
+}
+
+function getDesiredPort(config) {
+  const candidate = process.env.PORT ?? config?.PORT ?? 3000;
+  const port = Number(candidate);
+  if (!Number.isInteger(port) || port <= 0) return 3000;
+  return port;
+}
+
+function startSetupMode() {
   console.log('Starting in SETUP mode');
-  
+
+  const app = express();
+  attachCommonMiddleware(app);
+  attachSystemStatusRoute(app);
+
   const setupPaths = ['/', '/index.html', '/setup', '/app'];
   setupPaths.forEach(route => {
     app.get(route, (req, res) => {
       res.sendFile(path.join(__dirname, 'public', 'setup.html'));
     });
   });
-  
+
+  const port = getDesiredPort();
+
+  const server = app.listen(port);
+  attachListenErrorHandlers(server, port);
+  server.on('listening', () => {
+    console.log(`Setup wizard available at http://localhost:${port}/setup`);
+  });
+
   app.post('/api/save-config', (req, res) => {
     const { token, channelId } = req.body;
-    
+
     if (!token || !channelId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Token and channel ID are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Token and channel ID are required'
       });
     }
-    
+
     try {
       const encryptionKey = crypto.randomBytes(32).toString('hex');
       const initVector = crypto.randomBytes(16).toString('hex');
-      
+
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
       }
-      
+
       const configData = {
         DISCORD_TOKEN: token,
         CHANNEL_ID: channelId,
         ENCRYPTION_KEY: encryptionKey,
         INIT_VECTOR: initVector,
-        PORT: 3000
+        PORT: port
       };
-      
+
       fs.writeFileSync(configPath, JSON.stringify(configData, null, 2));
-      console.log('Configuration saved to config.json file');
-      
-      const envContent = 
+      console.log('Configuration saved to config/config.json');
+
+      const envContent =
 `DISCORD_TOKEN=${token}
 CHANNEL_ID=${channelId}
 ENCRYPTION_KEY=${encryptionKey}
 INIT_VECTOR=${initVector}
-PORT=3000`;
-    
+PORT=${port}`;
+
       try {
         fs.writeFileSync(path.resolve(__dirname, '.env'), envContent);
       } catch (envError) {
         console.log('Note: Could not write .env file, but config.json is used instead:', envError.message);
       }
-    
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: 'Configuration saved successfully',
         restartRequired: true
       });
-      
-      setTimeout(restartApp, 2000);
-      
+
+      setTimeout(() => {
+        console.log('Applying new configuration...');
+        server.close(() => {
+          isConfigValid = validateConfig();
+          if (!isConfigValid) {
+            console.error('Configuration still invalid after save; staying in setup mode.');
+            startSetupMode();
+            return;
+          }
+          startNormalMode();
+        });
+      }, 250);
     } catch (error) {
       console.error('Error saving configuration:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: `Failed to save configuration: ${error.message}` 
+      res.status(500).json({
+        success: false,
+        message: `Failed to save configuration: ${error.message}`
       });
     }
   });
-  
-  const setupPort = process.env.PORT || 3000;
-  app.listen(setupPort, () => {
-    console.log(`Setup wizard available at http://localhost:${setupPort}`);
-  });
-} else {
+}
+
+function startNormalMode() {
   console.log('Starting in NORMAL mode');
-  
+
   let config;
   try {
-    config = JSON.parse(fs.readFileSync(configPath));
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   } catch (error) {
     console.error('Error loading configuration:', error);
     process.exit(1);
   }
-  
+
+  const app = express();
+  attachCommonMiddleware(app);
+  attachSystemStatusRoute(app);
+
+  const upload = multer({ dest: 'uploads/' });
+
   const db = new sqlite3.Database('./data/files.db', (err) => {
     if (err) {
       console.error('Error opening database:', err.message);
@@ -199,24 +236,24 @@ PORT=3000`;
       )`);
     }
   });
-  
-  const discordClient = new Discord.Client({ 
+
+  const discordClient = new Discord.Client({
     intents: [
-      GatewayIntentBits.Guilds, 
+      GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent
-    ] 
+    ]
   });
-  
+
   const ENCRYPTION_KEY = Buffer.from(config.ENCRYPTION_KEY, 'hex');
   const IV = Buffer.from(config.INIT_VECTOR, 'hex');
   const DISCORD_TOKEN = config.DISCORD_TOKEN;
   const CHANNEL_ID = config.CHANNEL_ID;
-  
+
   app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   });
-  
+
   function convertFileSize(bytes) {
     const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
     let size = bytes;
@@ -231,7 +268,7 @@ PORT=3000`;
 
   async function chunkAndUpload(file, filename) {
     const fileSize = fs.statSync(file).size;
-    const chunkSize = 8 * 1024 * 1024; 
+    const chunkSize = 8 * 1024 * 1024;
     const chunks = Math.ceil(fileSize / chunkSize);
 
     console.log(`File size: ${fileSize} bytes`);
@@ -252,7 +289,7 @@ PORT=3000`;
           const attachment = new MessageAttachment(encryptedChunk, `${filename}_chunk_${currentChunk}.bin`);
           message = await channel.send({ files: [attachment] });
         } else {
-          message = await channel.send({ 
+          message = await channel.send({
             files: [{
               attachment: encryptedChunk,
               name: `${filename}_chunk_${currentChunk}.bin`
@@ -270,8 +307,8 @@ PORT=3000`;
     }
 
     return new Promise((resolve, reject) => {
-      db.run('INSERT INTO files (filename, messageIds, size) VALUES (?, ?, ?)', 
-        [filename, messageIds.join(','), fileSize], 
+      db.run('INSERT INTO files (filename, messageIds, size) VALUES (?, ?, ?)',
+        [filename, messageIds.join(','), fileSize],
         function(err) {
           if (err) {
             console.error('Error inserting file metadata into database:', err.message);
@@ -289,7 +326,7 @@ PORT=3000`;
     if (!req.file) {
       return res.status(400).send('No file uploaded');
     }
-    
+
     const file = req.file.path;
     const filename = req.file.originalname;
 
@@ -324,57 +361,56 @@ PORT=3000`;
         console.error('Error retrieving files from database:', err.message);
         return res.status(500).send('Error retrieving files');
       }
-      
+
       const files = rows.map(file => ({
         ...file,
         formattedSize: convertFileSize(file.size)
       }));
-      
+
       res.json(files);
     });
   });
 
   app.get('/download/:id', async (req, res) => {
     const fileId = req.params.id;
-    
+
     db.get('SELECT filename, messageIds, size FROM files WHERE id = ?', [fileId], async (err, file) => {
       if (err || !file) {
         console.error('Error retrieving file from database:', err?.message || 'File not found');
         return res.status(404).send('File not found');
       }
-      
+
       try {
         res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
         res.setHeader('Content-Length', file.size);
-        
+
         const messageIds = file.messageIds.split(',');
-        
         const writeStream = res;
-        
+
         for (let i = 0; i < messageIds.length; i++) {
           const messageId = messageIds[i];
           const channel = await discordClient.channels.fetch(CHANNEL_ID);
           const message = await channel.messages.fetch(messageId);
-          
+
           if (message.attachments.size === 0) {
             throw new Error(`No attachment found for message ${messageId}`);
           }
-          
+
           const attachment = message.attachments.first();
-          const response = await fetch(attachment.url);
+          const doFetch = await getFetchFn();
+          const response = await doFetch(attachment.url);
           const buffer = await response.arrayBuffer();
-          
+
           const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, IV);
           const decryptedChunk = Buffer.concat([
-            decipher.update(Buffer.from(buffer)), 
+            decipher.update(Buffer.from(buffer)),
             decipher.final()
           ]);
-          
+
           writeStream.write(decryptedChunk);
-          
           console.log(`Downloaded and decrypted chunk ${i + 1}/${messageIds.length}`);
         }
-        
+
         writeStream.end();
       } catch (error) {
         console.error('Error downloading file:', error);
@@ -389,17 +425,17 @@ PORT=3000`;
 
   app.delete('/file/:id', async (req, res) => {
     const fileId = req.params.id;
-    
+
     db.get('SELECT messageIds FROM files WHERE id = ?', [fileId], async (err, file) => {
       if (err || !file) {
         console.error('Error retrieving file from database:', err?.message || 'File not found');
         return res.status(404).send('File not found');
       }
-      
+
       try {
         const messageIds = file.messageIds.split(',');
         const channel = await discordClient.channels.fetch(CHANNEL_ID);
-        
+
         for (const messageId of messageIds) {
           try {
             const message = await channel.messages.fetch(messageId);
@@ -409,13 +445,13 @@ PORT=3000`;
             console.error(`Error deleting message ${messageId}:`, msgErr);
           }
         }
-        
+
         db.run('DELETE FROM files WHERE id = ?', [fileId], function(dbErr) {
           if (dbErr) {
             console.error('Error deleting file from database:', dbErr.message);
             return res.status(500).send('Error deleting file from database');
           }
-          
+
           console.log(`File with ID ${fileId} deleted successfully`);
           res.json({ success: true, message: 'File deleted successfully' });
         });
@@ -429,9 +465,11 @@ PORT=3000`;
   discordClient.login(DISCORD_TOKEN)
     .then(() => {
       console.log('Connected to Discord');
-      
-      const port = process.env.PORT || 3000;
-      app.listen(port, () => {
+
+      const port = getDesiredPort(config);
+      const server = app.listen(port);
+      attachListenErrorHandlers(server, port);
+      server.on('listening', () => {
         console.log(`Dashboard online at http://localhost:${port}`);
         console.log(`Using encryption with key length: ${ENCRYPTION_KEY.length} bytes`);
         console.log(`Using IV with length: ${IV.length} bytes`);
@@ -442,3 +480,15 @@ PORT=3000`;
       process.exit(1);
     });
 }
+
+isConfigValid = validateConfig();
+console.log(`Configuration valid: ${isConfigValid}`);
+
+if (!isConfigValid) {
+  startSetupMode();
+} else {
+  startNormalMode();
+}
+
+
+

@@ -98,18 +98,6 @@ Note:
    docker-compose up -d
    ```
 
-### Using Docker Directly
-
-1. Build the Docker image:
-   ```
-   docker build -t dcloud .
-   ```
-
-2. Run the container:
-   ```
-   docker run -d -p 3000:3000 --env-file .env -v $(pwd)/files.db:/app/files.db -v $(pwd)/uploads:/app/uploads --name dcloud dcloud
-   ```
-
 ## Accessing the Application
 
 Once running, access the application at:

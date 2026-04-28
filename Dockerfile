@@ -3,9 +3,10 @@ FROM node:18-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
-
-RUN npm install node-fetch@2
+RUN apk add --no-cache --virtual .build-deps python3 make g++ \
+	&& apk add --no-cache libstdc++ \
+	&& if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
+	&& apk del .build-deps
 
 COPY . .
 
