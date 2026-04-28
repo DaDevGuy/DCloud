@@ -1,15 +1,36 @@
-name: Docker Image CI
+name: Publish
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
-  push:
+  publish:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag (if not exists)
+        run: |
+          git tag v${{ steps.version.outputs.version }} || echo "Tag exists"
+          git push origin v${{ steps.version.outputs.version }} || echo "Already pushed"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -17,9 +38,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: dadevguy/dcloud:latest
+          tags: |
+            dadevguy/dcloud:latest
+            dadevguy/dcloud:${{ steps.version.outputs.version }}
